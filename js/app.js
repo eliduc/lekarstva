@@ -7,7 +7,7 @@
 /* Низкоуровневый слой — в storage.js (window.MedStore). get/set синхронные,
    но старый код вызывает их через await — это совместимо. */
 const store = window.MedStore;
-const APP_VERSION = '1.0 от 13.06.2026';
+const APP_VERSION = '1.1 от 13.06.2026';
 
 /* Новые строки интерфейса (синхронизация, ИИ-ключ, пароль) — дополняем L,
    чтобы они проходили через те же t()/tf() с фолбэком на русский. */
@@ -851,8 +851,17 @@ async function applyStatus(iso,merged){ merged=merged||{};
 }
 
 /* ============ SYNC RUNNERS ============ */
-let statusInFlight=false, configInFlight=false, statusPushTimer=null;
-function pushStatusSoon(){ if(!MedSync.isOn(state))return; clearTimeout(statusPushTimer); statusPushTimer=setTimeout(runStatusSync,1200); }
+let statusInFlight=false, configInFlight=false, statusPushTimer=null, syncChain=Promise.resolve();
+/* Единая очередь: конфиг и статус НИКОГДА не пишутся одновременно. Иначе два
+   коммита в одну ветку GitHub дают 409 (CONFLICT). Все записи — строго по очереди. */
+function queueSync(doConfig, doStatus){
+ syncChain = syncChain.then(async function(){
+  if(doConfig) await runConfigSync();
+  if(doStatus) await runStatusSync();
+ }).catch(function(){});
+ return syncChain;
+}
+function pushStatusSoon(){ if(!MedSync.isOn(state))return; clearTimeout(statusPushTimer); statusPushTimer=setTimeout(function(){queueSync(false,true)},1200); }
 async function runStatusSync(){ if(!MedSync.isOn(state)||statusInFlight)return; statusInFlight=true;
  try{ const iso=dateISO(); const local=await buildLocalStatus(iso);
   const res=await MedSync.syncStatus(state,store,local);
@@ -879,14 +888,14 @@ async function runConfigSync(){ if(!MedSync.isOn(state)||configInFlight)return; 
   if(pulled){ await applyConfig(pulled.state,pulled.generation); toast(t('cfg_updated')); }
   await MedSync.backupConfigIfChanged(state,store);
  }catch(e){} configInFlight=false; updSyncUI(); }
-function syncTick(){ if(!MedSync.isOn(state))return; runConfigSync(); runStatusSync(); }
+function syncTick(){ if(!MedSync.isOn(state))return; queueSync(true,true); }
 
 /* ============ SYNC SETTINGS HANDLERS ============ */
 async function saveSync(){ const repo=(document.getElementById('syncRepo')||{}).value||''; const tok=(document.getElementById('syncTok')||{}).value||'';
  state.sync.repo=repo.trim(); state.sync.token=tok.trim(); await saveState(); updSyncUI();
- if(MedSync.isOn(state)){ runConfigSync(); runStatusSync(); } }
+ if(MedSync.isOn(state)){ queueSync(true,true); } }
 async function setSyncEnabled(on){ state.sync.enabled=!!on; await saveState(); updSyncUI();
- if(MedSync.isOn(state)){ runConfigSync(); runStatusSync(); } }
+ if(MedSync.isOn(state)){ queueSync(true,true); } }
 async function saveDevice(v){ state.deviceName=(v||'').trim(); await saveState() }
 async function saveAiKey(v){ state.aiKey=(v||'').trim(); await saveState() }
 function syncStatusLine(){ if(!MedSync.isOn(state))return t('st_off'); const err=store.getMeta('lastSyncError'); return err?(t('st_err')+': '+err):t('st_synced'); }
@@ -921,7 +930,7 @@ async function forceRefresh(){ if(!confirm(t('refresh_q')))return;
  renderHome(); setInterval(checkReminders,5000);
  document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ checkReminders(); syncTick(); } });
  /* синхронизация с GitHub */
- if(MedSync.isOn(state)){ try{ await runConfigSync(); await runStatusSync(); }catch(e){} }
+ if(MedSync.isOn(state)){ try{ await queueSync(true,true); }catch(e){} }
  setInterval(syncTick, Math.max(8,Number(state.statusPollSec)||20)*1000);
  if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 })();
