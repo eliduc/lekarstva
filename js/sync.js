@@ -213,6 +213,63 @@ window.MedSync = (function () {
     });
   }
 
+  /* ======================= C. ВЕЧНЫЙ ЖУРНАЛ СОБЫТИЙ ======================= */
+  // По одному файлу на день, log/<iso>.json = массив событий. Никогда не
+  // перезаписывается затиранием: слияние — объединение по уникальному id (union),
+  // поэтому события всех устройств складываются без потерь.
+  function logPath(iso) { return 'log/' + iso + '.json'; }
+
+  function mergeLog(a, b) {
+    var seen = {}, out = [];
+    (a || []).concat(b || []).forEach(function (e) {
+      if (e && e.id && !seen[e.id]) { seen[e.id] = 1; out.push(e); }
+    });
+    out.sort(function (x, y) { return (x.ts || 0) - (y.ts || 0); });
+    return out;
+  }
+
+  // Слить локальные события за день с облачными и дописать (CAS, повтор при гонке).
+  // -> { merged, changed }   merged — полный набор за день (свои + чужие).
+  function syncLog(state, store, iso, localEvents, _tries) {
+    if (!isOn(state)) return Promise.resolve({ merged: localEvents || [], changed: false });
+    var c = conf(state); _tries = _tries || 0;
+    return readCloud(c, logPath(iso)).then(function (res) {
+      var cloud = res.data || [];
+      var merged = mergeLog(cloud, localEvents);
+      if (stable(merged) === stable(cloud)) {
+        store.setMeta('lastSyncError', null);
+        return { merged: merged, changed: false };
+      }
+      return putFile(c, logPath(iso), JSON.stringify(merged, null, 1), 'log ' + iso, res.sha).then(function () {
+        store.setMeta('lastSyncError', null);
+        return { merged: merged, changed: true };
+      });
+    }).catch(function (e) {
+      if (errText(e) === 'CONFLICT' && _tries < 3) return syncLog(state, store, iso, localEvents, _tries + 1);
+      store.setMeta('lastSyncError', errText(e));
+      return { merged: localEvents || [], changed: false, error: errText(e) };
+    });
+  }
+
+  // Список дат, по которым есть журнал (имена файлов log/<iso>.json без расширения).
+  function listLogDates(state) {
+    if (!isOn(state)) return Promise.resolve([]);
+    var c = conf(state);
+    return fetch('https://api.github.com/repos/' + c.repo + '/contents/log', { headers: headers(c) })
+      .then(function (r) {
+        if (r.status === 404) return [];
+        if (!r.ok) throw new Error('GitHub ' + r.status);
+        return r.json();
+      }).then(function (arr) {
+        return (arr || []).filter(function (x) { return x.type === 'file' && /\.json$/.test(x.name); })
+          .map(function (x) { return x.name.replace(/\.json$/, ''); }).sort();
+      });
+  }
+
+  function fetchLog(state, iso) {
+    return readCloud(conf(state), logPath(iso)).then(function (res) { return res.data || []; });
+  }
+
   function errText(e) {
     var s = String((e && e.message) || e);
     if (s.indexOf('Failed to fetch') >= 0) return 'нет сети';
@@ -227,6 +284,10 @@ window.MedSync = (function () {
     pullConfigIfNewer: pullConfigIfNewer,
     fetchConfig: fetchConfig,
     mergeStatus: mergeStatus,
-    syncStatus: syncStatus
+    syncStatus: syncStatus,
+    mergeLog: mergeLog,
+    syncLog: syncLog,
+    listLogDates: listLogDates,
+    fetchLog: fetchLog
   };
 })();

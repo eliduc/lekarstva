@@ -7,9 +7,43 @@
 /* Низкоуровневый слой — в storage.js (window.MedStore). get/set синхронные,
    но старый код вызывает их через await — это совместимо. */
 const store = window.MedStore;
-const APP_VERSION = '1.2 от 13.06.2026';
+const APP_VERSION = '1.3 от 13.06.2026';
 /* маленький футер с номером версии — показывается внизу на всех экранах */
 function verLine(){ return `<div class="note" style="text-align:center;opacity:.5;font-size:11px;margin-top:16px;letter-spacing:.02em">${t('ver_lbl')} ${APP_VERSION}</div>` }
+
+/* ============ ИСТОРИЯ СОБЫТИЙ (просмотр в настройках, под паролем) ============ */
+const EV_ICON={dose_given:'💊',dose_undone:'↩️',box_filled:'📦',box_emptied:'📭',refill:'📦',med_added:'➕',med_edited:'✏️',med_removed:'🗑',time_added:'⏰',time_changed:'⏰',time_removed:'⏰',sched_add:'🗓',sched_remove:'🗓'};
+function evCellLabel(cell){ const p=String(cell||'').split('|'); return (p.length===2)?((DS()[Number(p[0])]||'')+' '+p[1]):(cell||''); }
+function evText(ev){ return tf('ev_'+ev.type,{ time:ev.time||'', old:ev.old||'', med:ev.med||'', cell:evCellLabel(ev.cell), times:(ev.times||[]).join(' · ') }); }
+async function openHistory(){
+ const el=document.getElementById('scr-settings');
+ const header=`<h2>📜 ${t('hist_title')}</h2><button class="sb1" style="border-radius:11px;padding:10px 14px;font-weight:800;font-size:14px;margin-bottom:8px" onclick="renderSettings()">← ${t('hist_back')}</button>`;
+ el.innerHTML=header+`<div class="spin"></div><div class="note">${t('hist_loading')}</div>`;
+ let events=[];
+ try{
+  if(MedSync.isOn(state)){
+   const dates=await MedSync.listLogDates(state);
+   const logs=await Promise.all(dates.slice(-120).map(d=>MedSync.fetchLog(state,d).catch(()=>[])));
+   events=logs.reduce((a,b)=>a.concat(b),[]);
+  }
+  events=MedSync.mergeLog(events, getLog(dateISO())); // домержить локальные сегодняшние
+ }catch(e){}
+ if(document.getElementById('scr-settings').hidden)return; // ушли с экрана — не рисуем
+ events.sort((a,b)=>(b.ts||0)-(a.ts||0));
+ let html=header;
+ if(!events.length){ html+=`<div class="card"><div class="note" style="text-align:center;font-size:15px">${MedSync.isOn(state)?t('hist_empty'):t('hist_offline')}</div></div>`; }
+ else { let curDay='';
+  for(const ev of events){ const d=new Date(ev.ts||0); const iso=dateISO(d);
+   if(iso!==curDay){ curDay=iso; html+=`<h2 style="font-size:16px;margin:16px 0 6px">${DF()[d.getDay()]} · ${iso.slice(8,10)}.${iso.slice(5,7)}.${iso.slice(0,4)}</h2>`; }
+   const hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+   html+=`<div class="trow" style="padding:10px 13px;margin-top:8px">
+    <span style="font-size:22px;flex:0 0 auto">${EV_ICON[ev.type]||'•'}</span>
+    <span class="rowmid"><span style="font-weight:800;font-size:15px">${esc(evText(ev))}</span>
+     <span class="cnt">${hm}${(ev.by&&ev.by!=='?')?' · '+esc(ev.by):''}</span></span></div>`;
+  }
+ }
+ el.innerHTML=html;
+}
 
 /* Новые строки интерфейса (синхронизация, ИИ-ключ, пароль) — дополняем L,
    чтобы они проходили через те же t()/tf() с фолбэком на русский. */
@@ -73,6 +107,39 @@ Object.assign(L.uz,{
  pw_short:"Parol kamida 4 belgidan iborat boʻlsin.",pw_saved:"Parol oʻzgartirildi.",
  refresh_q:"Ilova soʻnggi versiyaga yangilansinmi? Maʼlumotlar saqlanadi.",ver_lbl:"Versiya",
  live_by:"belgiladi: {by}",live_upd:"yangilandi {t}"});
+/* строки экрана «История» */
+Object.assign(L.ru,{
+ hist_open:"История",hist_title:"История событий",hist_back:"Назад",hist_loading:"Загрузка истории…",
+ hist_empty:"Событий пока нет.",hist_offline:"Включите синхронизацию, чтобы видеть историю со всех устройств.",
+ ev_dose_given:"Выдано — {time}",ev_dose_undone:"Отмена выдачи — {time}",
+ ev_box_filled:"Ячейка пополнена — {cell}",ev_box_emptied:"Ячейка опустошена — {cell}",ev_refill:"Пополнение таблетницы — {times}",
+ ev_med_added:"Лекарство добавлено: {med}",ev_med_edited:"Лекарство изменено: {med}",ev_med_removed:"Лекарство удалено: {med}",
+ ev_time_added:"Время добавлено: {time}",ev_time_changed:"Время изменено: {old} → {time}",ev_time_removed:"Время удалено: {time}",
+ ev_sched_add:"В {time} добавлено: {med}",ev_sched_remove:"Из {time} убрано: {med}"});
+Object.assign(L.en,{
+ hist_open:"History",hist_title:"Event history",hist_back:"Back",hist_loading:"Loading history…",
+ hist_empty:"No events yet.",hist_offline:"Enable sync to see history from all devices.",
+ ev_dose_given:"Given — {time}",ev_dose_undone:"Give undone — {time}",
+ ev_box_filled:"Cell filled — {cell}",ev_box_emptied:"Cell emptied — {cell}",ev_refill:"Pillbox refilled — {times}",
+ ev_med_added:"Medication added: {med}",ev_med_edited:"Medication changed: {med}",ev_med_removed:"Medication removed: {med}",
+ ev_time_added:"Time added: {time}",ev_time_changed:"Time changed: {old} → {time}",ev_time_removed:"Time removed: {time}",
+ ev_sched_add:"Added to {time}: {med}",ev_sched_remove:"Removed from {time}: {med}"});
+Object.assign(L.he,{
+ hist_open:"היסטוריה",hist_title:"היסטוריית אירועים",hist_back:"חזרה",hist_loading:"טוען היסטוריה…",
+ hist_empty:"אין אירועים עדיין.",hist_offline:"הפעל סנכרון כדי לראות היסטוריה מכל המכשירים.",
+ ev_dose_given:"ניתן — {time}",ev_dose_undone:"ביטול מתן — {time}",
+ ev_box_filled:"תא מולא — {cell}",ev_box_emptied:"תא רוקן — {cell}",ev_refill:"מילוי הקופסה — {times}",
+ ev_med_added:"תרופה נוספה: {med}",ev_med_edited:"תרופה שונתה: {med}",ev_med_removed:"תרופה הוסרה: {med}",
+ ev_time_added:"שעה נוספה: {time}",ev_time_changed:"שעה שונתה: {old} → {time}",ev_time_removed:"שעה הוסרה: {time}",
+ ev_sched_add:"נוסף ל-{time}: {med}",ev_sched_remove:"הוסר מ-{time}: {med}"});
+Object.assign(L.uz,{
+ hist_open:"Tarix",hist_title:"Hodisalar tarixi",hist_back:"Orqaga",hist_loading:"Tarix yuklanmoqda…",
+ hist_empty:"Hodisalar hali yoʻq.",hist_offline:"Barcha qurilmalardan tarixni koʻrish uchun sinxronizatsiyani yoqing.",
+ ev_dose_given:"Berildi — {time}",ev_dose_undone:"Berish bekor qilindi — {time}",
+ ev_box_filled:"Katak toʻldirildi — {cell}",ev_box_emptied:"Katak boʻshatildi — {cell}",ev_refill:"Qutiga toʻldirish — {times}",
+ ev_med_added:"Dori qoʻshildi: {med}",ev_med_edited:"Dori oʻzgartirildi: {med}",ev_med_removed:"Dori oʻchirildi: {med}",
+ ev_time_added:"Vaqt qoʻshildi: {time}",ev_time_changed:"Vaqt oʻzgartirildi: {old} → {time}",ev_time_removed:"Vaqt oʻchirildi: {time}",
+ ev_sched_add:"{time} ga qoʻshildi: {med}",ev_sched_remove:"{time} dan olib tashlandi: {med}"});
 
 /* ============ TELEGRAM ============ */
 function tgConfigured(){ return !!(state&&state.tgToken&&state.tgChat) }
@@ -135,7 +202,7 @@ async function getGivenAt(iso){ try{const raw=await store.get('medapp:givenat:'+
 async function unmarkDone(iso,time){ const d=await getDone(iso); const i=d.indexOf(time); if(i>=0){d.splice(i,1);doneCache[iso]=d;await store.set('medapp:done:'+iso,JSON.stringify(d))}
  await setSlotMeta(iso,time); pushStatusSoon(iso); }
 async function undoGiven(tm){ if(!confirm(tf('undo_q',{t:tm})))return;
- await unmarkDone(dateISO(),tm);
+ await unmarkDone(dateISO(),tm); appendEvent('dose_undone',{time:tm});
  const day=new Date().getDay(); if(boxState&&boxState[day+'|'+tm]){ await boxTouch(day+'|'+tm,false) }
  renderHome(true) }
 /* box cells: key "<weekday>|<time>" -> ISO date emptied; absent key = cell is filled */
@@ -531,12 +598,12 @@ function cellContents(day,tm){ const meds=boxMedsAt(tm); let rows='';
   <div class="note" style="font-weight:800;font-size:14.5px;margin:0 0 8px">${t('c_in_cell')}</div>
   <div class="alist" style="max-height:52vh">${rows}</div>
   <button class="bigbtn gray" onclick="closeModal()">${t('close')}</button>`) }
-async function markCellFull(day,tm){ await boxTouch(day+'|'+tm,false); pushStatusSoon(dateISO()); closeModal(); renderCollect(); renderHome(false) }
-async function markCellEmpty(day,tm){ await loadBox(); await boxTouch(day+'|'+tm,true,dateISO()); pushStatusSoon(dateISO()); closeModal(); renderCollect(); renderHome(false) }
-async function finishRefill(){ if(refillCtx){ for(const tm of (refillCtx.times||[])){ await boxTouch(refillCtx.day+'|'+tm,false) } pushStatusSoon(dateISO()) }
+async function markCellFull(day,tm){ await boxTouch(day+'|'+tm,false); appendEvent('box_filled',{cell:day+'|'+tm}); pushStatusSoon(dateISO()); closeModal(); renderCollect(); renderHome(false) }
+async function markCellEmpty(day,tm){ await loadBox(); await boxTouch(day+'|'+tm,true,dateISO()); appendEvent('box_emptied',{cell:day+'|'+tm}); pushStatusSoon(dateISO()); closeModal(); renderCollect(); renderHome(false) }
+async function finishRefill(){ if(refillCtx){ appendEvent('refill',{day:refillCtx.day,times:(refillCtx.times||[]).slice()}); for(const tm of (refillCtx.times||[])){ await boxTouch(refillCtx.day+'|'+tm,false) } pushStatusSoon(dateISO()) }
  refillCtx=null; document.getElementById('wiz').classList.remove('open'); show('home') }
 async function confirmGroup(){ const s=steps[stepIdx];
- if(steps[stepIdx+1]&&steps[stepIdx+1].k==='thanks'){ await markDone(dateISO(),s.time); await emptyCell(s.time); notifyGiven(s.time) }
+ if(steps[stepIdx+1]&&steps[stepIdx+1].k==='thanks'){ await markDone(dateISO(),s.time); await emptyCell(s.time); notifyGiven(s.time); appendEvent('dose_given',{time:s.time}) }
  stepIdx++; renderStep() }
 
 /* ============ SETTINGS PASSWORD GATE ============ */
@@ -585,7 +652,8 @@ function renderSettings(){ if(!setAuthed){renderSettingsGate();return} const el=
   lib+=`<div class="libc">${im?`<img src="${im}">`:`<div class="noimg" style="background:${d.bg};color:${d.c}">${icon(m.type,30)}</div>`}
    <div class="n">${esc(m.name)}</div>${medRu(m)?`<div class="n" style="font-size:12.5px;color:var(--muted);margin-top:1px">${esc(medRu(m))}</div>`:''}<div class="ty" style="color:${d.c}">${tyLabel(m.type)}</div>
    <div class="btns"><button class="ebtn" onclick="editMed('${id}')">${t('edit')}</button><button class="dbtn" onclick="delMed('${id}')">${t('del')}</button></div></div>` }
- el.innerHTML=`<h2>👤 ${t('f_caregiver')}</h2>
+ el.innerHTML=`<button class="bigbtn" style="background:#5b21b6;margin-top:4px" onclick="openHistory()">📜 ${t('hist_open')}</button>
+ <h2>👤 ${t('f_caregiver')}</h2>
  <div class="card"><input type="text" value="${esc(state.caregiver||'')}" onchange="saveCaregiver(this.value)" style="font-weight:800;font-size:17px">
  <div class="note">${t('cg_note')}</div></div>
  <h2>${tf('set_times',{n:state.times.length})}</h2>
@@ -673,23 +741,23 @@ async function sendSummaryNow(){ const m=document.getElementById('sumNowMsg');
 async function setRefillTime(v){ if(/^\d{2}:\d{2}$/.test(v)){state.refillTime=v; await saveState()} }
 function testRefill(){ ensureAudio(); openRefillAlert({iso:dateISO(),day:new Date().getDay()}) }
 async function addTime(){ const tm=prompt(t('new_time'),'14:00'); if(!tm||!/^\d{2}:\d{2}$/.test(tm))return;
- if(!state.times.includes(tm)){state.times.push(tm);state.schedule[tm]=state.schedule[tm]||[]} await saveState(); renderSettings() }
+ if(!state.times.includes(tm)){state.times.push(tm);state.schedule[tm]=state.schedule[tm]||[];appendEvent('time_added',{time:tm})} await saveState(); renderSettings() }
 async function changeTime(i,val){ if(!/^\d{2}:\d{2}$/.test(val))return; const old=state.times[i]; if(old===val)return;
  state.schedule[val]=(state.schedule[val]||[]).concat(state.schedule[old]||[]); delete state.schedule[old];
- state.times[i]=val; await saveState(); renderSettings() }
+ state.times[i]=val; appendEvent('time_changed',{old:old,time:val}); await saveState(); renderSettings() }
 async function delTime(i){ const tm=state.times[i]; if(!confirm(tf('del_time',{t:tm})))return;
- delete state.schedule[tm]; state.times.splice(i,1); await saveState(); renderSettings() }
-async function removeFromTime(tm,id){ state.schedule[tm]=(state.schedule[tm]||[]).filter(x=>x!==id); await saveState(); renderSettings() }
+ delete state.schedule[tm]; state.times.splice(i,1); appendEvent('time_removed',{time:tm}); await saveState(); renderSettings() }
+async function removeFromTime(tm,id){ const mn=(state.meds[id]||{}).name||id; state.schedule[tm]=(state.schedule[tm]||[]).filter(x=>x!==id); appendEvent('sched_remove',{time:tm,med:mn}); await saveState(); renderSettings() }
 async function delMed(id){ const m=state.meds[id]; if(!confirm(tf('del_med',{m:m.name})))return;
  delete state.meds[id]; for(const tm of state.times)state.schedule[tm]=(state.schedule[tm]||[]).filter(x=>x!==id);
- await saveState(); renderSettings() }
+ appendEvent('med_removed',{med:m.name}); await saveState(); renderSettings() }
 function pickMedFor(tm){ const used=new Set(state.schedule[tm]||[]); let rows='';
  for(const [id,m] of Object.entries(state.meds)){ if(used.has(id))continue; const d=TYPES[m.type]||TYPES.tab; const im=medImg(m);
   rows+=`<div class="medchip" style="cursor:pointer" onclick="addToTime('${tm}','${id}')">${im?`<img src="${im}">`:`<span style="color:${d.c}">${icon(m.type,26)}</span>`}
    <div><div class="mn">${esc(m.name)}${medRu(m)?` <span style="font-weight:800;color:var(--muted)">${esc(medRu(m))}</span>`:''}</div><div class="mq">${tyLabel(m.type)} · ${esc(locQty(m.qty))}</div></div><span style="margin-inline-start:auto;font-weight:900;color:var(--teal)">＋</span></div>` }
  openModal(`<h3>${tf('add_to',{t:tm})}</h3>${rows||'<div class="note">'+t('all_added')+'</div>'}
   <button class="bigbtn gray" onclick="closeModal()">${t('close')}</button>`) }
-async function addToTime(tm,id){ (state.schedule[tm]=state.schedule[tm]||[]).push(id); await saveState(); closeModal(); renderSettings() }
+async function addToTime(tm,id){ (state.schedule[tm]=state.schedule[tm]||[]).push(id); appendEvent('sched_add',{time:tm,med:(state.meds[id]||{}).name||id}); await saveState(); closeModal(); renderSettings() }
 async function resetAll(){ if(!confirm(t('reset_q')))return; state=defaultState(); await saveState(); renderSettings() }
 function testAlert(){ ensureAudio(); openAlert(state.times[0]||'08:00',new Date().getDay()) }
 
@@ -741,6 +809,7 @@ async function saveMed(){ const name=document.getElementById('ename').value.trim
  if(!med.warn&&!med.warnKey)med.warnLevel=undefined;
  if(String(editPhoto||'').startsWith('data:'))med.img=editPhoto; else med.img=old.img||null;
  const id=editId||('m'+Date.now());
+ appendEvent(editId?'med_edited':'med_added',{med:name});
  state.meds[id]=med; await saveState(); closeModal(); renderSettings() }
 
 /* photo helpers */
@@ -813,10 +882,10 @@ async function applyRx(){ const meds=window._rxMeds||[];
   let id=Object.keys(state.meds).find(k=>state.meds[k].name===name);
   const type=document.getElementById('rxt'+i).value, qty=document.getElementById('rxq'+i).value.trim();
   if(!id){ id='m'+Date.now()+'_'+i;
-   state.meds[id]={name,type,qty,sub:[meds[i].substance,meds[i].note].filter(Boolean).join(' · '),img:null} }
-  else { state.meds[id].type=type; if(qty)state.meds[id].qty=qty }
+   state.meds[id]={name,type,qty,sub:[meds[i].substance,meds[i].note].filter(Boolean).join(' · '),img:null}; appendEvent('med_added',{med:name}) }
+  else { state.meds[id].type=type; if(qty)state.meds[id].qty=qty; appendEvent('med_edited',{med:name}) }
   const times=(document.getElementById('rxh'+i).value||'').split(',').map(s=>s.trim()).filter(s=>/^\d{1,2}:\d{2}$/.test(s)).map(s=>s.padStart(5,'0'));
-  for(const tm of times){ if(!state.times.includes(tm)){state.times.push(tm);state.schedule[tm]=[]}
+  for(const tm of times){ if(!state.times.includes(tm)){state.times.push(tm);state.schedule[tm]=[];appendEvent('time_added',{time:tm})}
    if(!(state.schedule[tm]||[]).includes(id))(state.schedule[tm]=state.schedule[tm]||[]).push(id) } }
  await saveState(); closeModal(); renderSettings() }
 
@@ -853,17 +922,39 @@ async function applyStatus(iso,merged){ merged=merged||{};
 }
 
 /* ============ SYNC RUNNERS ============ */
-let statusInFlight=false, configInFlight=false, statusPushTimer=null, syncChain=Promise.resolve();
-/* Единая очередь: конфиг и статус НИКОГДА не пишутся одновременно. Иначе два
-   коммита в одну ветку GitHub дают 409 (CONFLICT). Все записи — строго по очереди. */
-function queueSync(doConfig, doStatus){
+let statusInFlight=false, configInFlight=false, logInFlight=false, statusPushTimer=null, logPushTimer=null, syncChain=Promise.resolve(), evCounter=0;
+/* Единая очередь: конфиг, статус и журнал НИКОГДА не пишутся одновременно —
+   иначе два коммита в одну ветку GitHub дают 409 (CONFLICT). Строго по очереди. */
+function queueSync(doConfig, doStatus, doLogs){
  syncChain = syncChain.then(async function(){
   if(doConfig) await runConfigSync();
   if(doStatus) await runStatusSync();
+  if(doLogs) await runLogSync();
  }).catch(function(){});
  return syncChain;
 }
-function pushStatusSoon(){ if(!MedSync.isOn(state))return; clearTimeout(statusPushTimer); statusPushTimer=setTimeout(function(){queueSync(false,true)},1200); }
+function pushStatusSoon(){ if(!MedSync.isOn(state))return; clearTimeout(statusPushTimer); statusPushTimer=setTimeout(function(){queueSync(false,true,false)},1200); }
+function pushLogSoon(){ if(!MedSync.isOn(state))return; clearTimeout(logPushTimer); logPushTimer=setTimeout(function(){queueSync(false,false,true)},1200); }
+
+/* ---- вечный журнал событий (локально + досылка на сервер) ---- */
+function logKey(iso){ return 'medapp:log:'+iso; }
+function getLog(iso){ try{ return JSON.parse(store.get(logKey(iso)))||[]; }catch(e){ return []; } }
+function getLogDirty(){ try{ return JSON.parse(store.get('medapp:logdirty'))||[]; }catch(e){ return []; } }
+function setLogDirty(arr){ store.set('medapp:logdirty', JSON.stringify(arr)); }
+/* записать событие: всегда локально (досылается, когда появится сеть/синхронизация) */
+function appendEvent(type, details){
+ const ts=Date.now(); const iso=dateISO(new Date(ts));
+ const ev=Object.assign({ id:deviceName()+'-'+ts+'-'+(evCounter++), ts:ts, type:type, by:deviceName() }, details||{});
+ const arr=getLog(iso); arr.push(ev); store.set(logKey(iso), JSON.stringify(arr));
+ const d=getLogDirty(); if(d.indexOf(iso)<0){ d.push(iso); setLogDirty(d); }
+ pushLogSoon();
+}
+async function runLogSync(){ if(!MedSync.isOn(state)||logInFlight)return; logInFlight=true;
+ try{ const remaining=[];
+  for(const iso of getLogDirty().slice()){ const res=await MedSync.syncLog(state,store,iso,getLog(iso));
+   if(res&&!res.error){ store.set(logKey(iso), JSON.stringify(res.merged)); } else { remaining.push(iso); } }
+  setLogDirty(remaining);
+ }catch(e){} logInFlight=false; updSyncUI(); }
 async function runStatusSync(){ if(!MedSync.isOn(state)||statusInFlight)return; statusInFlight=true;
  try{ const iso=dateISO(); const local=await buildLocalStatus(iso);
   const res=await MedSync.syncStatus(state,store,local);
@@ -890,14 +981,14 @@ async function runConfigSync(){ if(!MedSync.isOn(state)||configInFlight)return; 
   if(pulled){ await applyConfig(pulled.state,pulled.generation); toast(t('cfg_updated')); }
   await MedSync.backupConfigIfChanged(state,store);
  }catch(e){} configInFlight=false; updSyncUI(); }
-function syncTick(){ if(!MedSync.isOn(state))return; queueSync(true,true); }
+function syncTick(){ if(!MedSync.isOn(state))return; queueSync(true,true,true); }
 
 /* ============ SYNC SETTINGS HANDLERS ============ */
 async function saveSync(){ const repo=(document.getElementById('syncRepo')||{}).value||''; const tok=(document.getElementById('syncTok')||{}).value||'';
  state.sync.repo=repo.trim(); state.sync.token=tok.trim(); await saveState(); updSyncUI();
- if(MedSync.isOn(state)){ queueSync(true,true); } }
+ if(MedSync.isOn(state)){ queueSync(true,true,true); } }
 async function setSyncEnabled(on){ state.sync.enabled=!!on; await saveState(); updSyncUI();
- if(MedSync.isOn(state)){ queueSync(true,true); } }
+ if(MedSync.isOn(state)){ queueSync(true,true,true); } }
 async function saveDevice(v){ state.deviceName=(v||'').trim(); await saveState() }
 async function saveAiKey(v){ state.aiKey=(v||'').trim(); await saveState() }
 function syncStatusLine(){ if(!MedSync.isOn(state))return t('st_off'); const err=store.getMeta('lastSyncError'); return err?(t('st_err')+': '+err):t('st_synced'); }
@@ -932,7 +1023,7 @@ async function forceRefresh(){ if(!confirm(t('refresh_q')))return;
  renderHome(); setInterval(checkReminders,5000);
  document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ checkReminders(); syncTick(); } });
  /* синхронизация с GitHub */
- if(MedSync.isOn(state)){ try{ await queueSync(true,true); }catch(e){} }
+ if(MedSync.isOn(state)){ try{ await queueSync(true,true,true); }catch(e){} }
  setInterval(syncTick, Math.max(8,Number(state.statusPollSec)||20)*1000);
  if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 })();
