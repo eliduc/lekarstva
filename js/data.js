@@ -31,15 +31,15 @@ function defaultState(){return JSON.parse(JSON.stringify({
  times:["08:00","14:00","20:00"],
  /* Назначение Григория Разумовского, действует с 15 июня 2026 (по приложенным PDF) */
  meds:{
-  esomeprazole:{name:"ESOMEPRAZOLE INOVAMED",ru:"ЭЗОМЕПРАЗОЛ ИНОВАМЕД",type:"tab",qty:"1 таблетка",sub:"Esomeprazole 40 мг · защита желудка",warn:"Натощак, за 30–60 мин до завтрака — принять первым",warnLevel:"amber",img:"esomeprazole"},
+  esomeprazole:{name:"ESOMEPRAZOLE INOVAMED",ru:"ЭЗОМЕПРАЗОЛ ИНОВАМЕД",type:"tab",qty:"1 таблетка",sub:"Esomeprazole 40 мг · защита желудка",warn:"⚠ Внимание! Натощак, за 30–60 мин до завтрака — принять первым",warnLevel:"amber",img:"esomeprazole"},
   fusid:{name:"FUSID",ru:"ФУСИД",type:"tab",qty:"1 таблетка",sub:"Furosemide 40 мг · мочегонное",img:"fusid"},
   forxiga:{name:"FORXIGA",ru:"ФОРКСИГА",type:"tab",qty:"1 таблетка",sub:"Dapagliflozin 10 мг · для сердца / сахар",img:"forxiga"},
-  amiodacore:{name:"AMIODACORE",ru:"АМИОДАКОР",type:"tab",qty:"1 таблетка",sub:"Amiodarone 200 мг · от аритмии · = AMIOCARD / PROCOR",warn:"Принимать 5 дней в неделю — НЕ давать по вторникам и пятницам",warnLevel:"amber",excludeDays:[2,5],img:"amiodacore"},
-  eliquis:{name:"ELIQUIS",ru:"ЭЛИКВИС",type:"tab",qty:"1 таблетка",sub:"Apixaban 5 мг · разжижает кровь",warn:"Антикоагулянт · глотать целиком, не дробить, не пропускать",warnLevel:"red",img:"eliquis"},
-  lipitor:{name:"LIPITOR / LITORVA 40",ru:"ЛИПИТОР / ЛИТОРВА",type:"tab",qty:"1 таблетка",sub:"Atorvastatin 40 мг · холестерин",img:"lipitor"},
-  avilac:{name:"AVILAC",ru:"АВИЛАК",type:"syr",qty:"30 мл",sub:"Lactulose 670 мг/мл · слабительное",img:"avilac"},
+  amiodacore:{name:"AMIODACORE",ru:"АМИОДАКОР",type:"tab",qty:"1 таблетка",sub:"Amiodarone 200 мг · от аритмии · = AMIOCARD / PROCOR",warn:"Принимать 5 дней в неделю — НЕ давать по ВТОРНИКАМ и ПЯТНИЦАМ",warnLevel:"amber",excludeDays:[2,5],img:"amiodacore"},
+  eliquis:{name:"ELIQUIS",ru:"ЭЛИКВИС",type:"tab",qty:"1 таблетка",sub:"Apixaban 5 мг · разжижает кровь",warn:"АНТИКОАГУЛЯНТ · глотать целиком, не дробить, не пропускать",warnLevel:"red",img:"eliquis"},
+  lipitor:{name:"LIPITOR или LITORVA 40",ru:"ЛИПИТОР / ЛИТОРВА",type:"tab",qty:"1 таблетка",sub:"Atorvastatin 40 мг · холестерин",img:"lipitor"},
+  avilac:{name:"AVILAC",ru:"АВИЛАК",type:"syr",qty:"30 мл",sub:"Lactulose 670 мг/мл · слабительное (сироп)",img:"avilac"},
   aerovent:{name:"AEROVENT",ru:"АЭРОВЕНТ",type:"inh",qty:"1 мл",sub:"Ipratropium 0,25 мг/мл · бронхолитик",warn:"Развести: 1 мл AEROVENT + 2–3 мл физраствора 0,9%",warnLevel:"info",img:"aerovent"},
-  flixotide:{name:"FLIXOTIDE",ru:"ФЛИКСОТИД",type:"inh",qty:"2 мл",sub:"Fluticasone 0,5 мг/2 мл · стероид",warn:"0,5 мг = 1 небула (2 мл) · НЕ разбавлять. Сначала AEROVENT, через 5 мин FLIXOTIDE, не смешивать в одной чашке",warnLevel:"info",img:"flixotide"}
+  flixotide:{name:"FLIXOTIDE",ru:"ФЛИКСОТИД",type:"inh",qty:"2 мл",sub:"Fluticasone 0,5 мг/2 мл · стероид",warn:"0,5 мг = 1 небула (2 мл) · НЕ разбавлять. Сначала AEROVENT, через 5 минут FLIXOTIDE. Не смешивать в одной чашке.",warnLevel:"info",img:"flixotide"}
  },
  schedule:{
   "08:00":["esomeprazole","fusid","forxiga","amiodacore","eliquis","avilac","aerovent","flixotide"],

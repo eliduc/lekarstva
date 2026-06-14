@@ -3,7 +3,7 @@
  * Стратегия: сеть в приоритете (обновления доходят сразу), при недоступности — кэш.
  * Запросы к GitHub API (api.github.com, другой origin) идут мимо кэша.
  */
-var CACHE = 'meds-shell-v6';
+var CACHE = 'meds-shell-v7';
 var SHELL = [
   './',
   'index.html',
