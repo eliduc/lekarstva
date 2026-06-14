@@ -3,7 +3,7 @@
  * Стратегия: сеть в приоритете (обновления доходят сразу), при недоступности — кэш.
  * Запросы к GitHub API (api.github.com, другой origin) идут мимо кэша.
  */
-var CACHE = 'meds-shell-v5';
+var CACHE = 'meds-shell-v6';
 var SHELL = [
   './',
   'index.html',
@@ -17,17 +17,15 @@ var SHELL = [
   'icons/icon-180.png',
   'icons/icon-192.png',
   'icons/icon-512.png',
-  'img/aerovent.jpg',
-  'img/amiocard.jpg',
-  'img/eliquis.jpg',
-  'img/flixotide.jpg',
-  'img/forxiga.jpg',
+  'img/esomeprazole.jpg',
   'img/fusid.jpg',
-  'img/laevolac.jpg',
-  'img/laxadin.jpg',
+  'img/forxiga.jpg',
+  'img/amiodacore.jpg',
+  'img/eliquis.jpg',
   'img/lipitor.jpg',
-  'img/mucoless.jpg',
-  'img/vitamin_d3.jpg'
+  'img/avilac.jpg',
+  'img/aerovent.jpg',
+  'img/flixotide.jpg'
 ];
 
 self.addEventListener('install', function (e) {

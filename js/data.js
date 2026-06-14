@@ -28,43 +28,37 @@ function defaultState(){return JSON.parse(JSON.stringify({
  tgChat:"",
  tgMissedMin:30,
  tgSummary:"22:00",
- times:["08:00","12:00","16:00","18:00","20:00"],
+ times:["08:00","14:00","20:00"],
+ /* Назначение Григория Разумовского, действует с 15 июня 2026 (по приложенным PDF) */
  meds:{
-  fusid:{name:"FUSID",type:"tab",qty:"1 таблетка",subKey:"sub_fusid",img:"fusid"},
-  forxiga:{name:"FORXIGA",type:"tab",qty:"1 таблетка",subKey:"sub_forxiga",img:"forxiga"},
-  amiocard:{name:"AMIOCARD",type:"tab",qty:"1 таблетка",subKey:"sub_amiocard",warnKey:"w_amiocard",warnLevel:"red",excludeDays:[2,5],img:"amiocard"},
-  eliquis:{name:"ELIQUIS",type:"tab",qty:"1 таблетка",subKey:"sub_eliquis",warnKey:"w_eliquis",warnLevel:"red",img:"eliquis"},
-  laevolac:{name:"LAEVOLAC",type:"syr",qty:"30 мл",subKey:"sub_laevolac",img:"laevolac"},
-  mucoless:{name:"MUCOLESS",type:"drop",qty:"4 мл",subKey:"sub_mucoless",img:"mucoless"},
-  aerovent:{name:"AEROVENT",type:"inh",qty:"1 мл",subKey:"sub_aerovent",warnKey:"w_aerovent",warnLevel:"info",img:"aerovent"},
-  flixotide:{name:"FLIXOTIDE",type:"inh",qty:"4 ампулы (4 мг)",subKey:"sub_flixotide",img:"flixotide"},
-  vitamind3:{name:"VITAMIN D3",type:"cap",qty:"2 капсулы",subKey:"sub_vitd",img:"vitamin_d3"},
-  lipitor:{name:"LIPITOR",type:"tab",qty:"1 таблетка",subKey:"sub_lipitor",img:"lipitor"},
-  laxadin:{name:"LAXADIN",type:"tab",qty:"2 таблетки",subKey:"sub_laxadin",img:"laxadin"},
-  glycerin:{name:"GLYCERIN",type:"sup",qty:"1 свеча",subKey:"sub_glycerin",img:null}
+  esomeprazole:{name:"ESOMEPRAZOLE INOVAMED",ru:"ЭЗОМЕПРАЗОЛ ИНОВАМЕД",type:"tab",qty:"1 таблетка",sub:"Esomeprazole 40 мг · защита желудка",warn:"Натощак, за 30–60 мин до завтрака — принять первым",warnLevel:"amber",img:"esomeprazole"},
+  fusid:{name:"FUSID",ru:"ФУСИД",type:"tab",qty:"1 таблетка",sub:"Furosemide 40 мг · мочегонное",img:"fusid"},
+  forxiga:{name:"FORXIGA",ru:"ФОРКСИГА",type:"tab",qty:"1 таблетка",sub:"Dapagliflozin 10 мг · для сердца / сахар",img:"forxiga"},
+  amiodacore:{name:"AMIODACORE",ru:"АМИОДАКОР",type:"tab",qty:"1 таблетка",sub:"Amiodarone 200 мг · от аритмии · = AMIOCARD / PROCOR",warn:"Принимать 5 дней в неделю — НЕ давать по вторникам и пятницам",warnLevel:"amber",excludeDays:[2,5],img:"amiodacore"},
+  eliquis:{name:"ELIQUIS",ru:"ЭЛИКВИС",type:"tab",qty:"1 таблетка",sub:"Apixaban 5 мг · разжижает кровь",warn:"Антикоагулянт · глотать целиком, не дробить, не пропускать",warnLevel:"red",img:"eliquis"},
+  lipitor:{name:"LIPITOR / LITORVA 40",ru:"ЛИПИТОР / ЛИТОРВА",type:"tab",qty:"1 таблетка",sub:"Atorvastatin 40 мг · холестерин",img:"lipitor"},
+  avilac:{name:"AVILAC",ru:"АВИЛАК",type:"syr",qty:"30 мл",sub:"Lactulose 670 мг/мл · слабительное",img:"avilac"},
+  aerovent:{name:"AEROVENT",ru:"АЭРОВЕНТ",type:"inh",qty:"1 мл",sub:"Ipratropium 0,25 мг/мл · бронхолитик",warn:"Развести: 1 мл AEROVENT + 2–3 мл физраствора 0,9%",warnLevel:"info",img:"aerovent"},
+  flixotide:{name:"FLIXOTIDE",ru:"ФЛИКСОТИД",type:"inh",qty:"2 мл",sub:"Fluticasone 0,5 мг/2 мл · стероид",warn:"0,5 мг = 1 небула (2 мл) · НЕ разбавлять. Сначала AEROVENT, через 5 мин FLIXOTIDE, не смешивать в одной чашке",warnLevel:"info",img:"flixotide"}
  },
  schedule:{
-  "08:00":["fusid","forxiga","amiocard","eliquis","laevolac","mucoless","aerovent","flixotide"],
-  "12:00":["vitamind3","aerovent","flixotide"],
-  "16:00":["aerovent"],
-  "18:00":["lipitor","laxadin","flixotide"],
-  "20:00":["eliquis","aerovent"]
+  "08:00":["esomeprazole","fusid","forxiga","amiodacore","eliquis","avilac","aerovent","flixotide"],
+  "14:00":["flixotide"],
+  "20:00":["eliquis","lipitor","aerovent","flixotide"]
  }
 }))}
 
 /* ---- добавлено при переходе на клиент-серверную структуру ---- */
 var IMG_SRC = {
- "aerovent": "img/aerovent.jpg",
- "amiocard": "img/amiocard.jpg",
- "eliquis": "img/eliquis.jpg",
- "flixotide": "img/flixotide.jpg",
- "forxiga": "img/forxiga.jpg",
+ "esomeprazole": "img/esomeprazole.jpg",
  "fusid": "img/fusid.jpg",
- "laxadin": "img/laxadin.jpg",
+ "forxiga": "img/forxiga.jpg",
+ "amiodacore": "img/amiodacore.jpg",
+ "eliquis": "img/eliquis.jpg",
  "lipitor": "img/lipitor.jpg",
- "mucoless": "img/mucoless.jpg",
- "vitamin_d3": "img/vitamin_d3.jpg",
- "laevolac": "img/laevolac.jpg"
+ "avilac": "img/avilac.jpg",
+ "aerovent": "img/aerovent.jpg",
+ "flixotide": "img/flixotide.jpg"
 };
 function medImg(m){ if(!m||!m.img)return null;
   if(typeof m.img==='string'&&m.img.indexOf('data:')===0)return m.img;

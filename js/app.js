@@ -8,7 +8,7 @@
    но старый код вызывает их через await — это совместимо. */
 const store = window.MedStore;
 const STAGE = !!(window.MedStore && window.MedStore.isStage); // stage-версия (отдельные данные, Telegram выключен)
-const APP_VERSION = '1.4 от 13.06.2026';
+const APP_VERSION = '1.5 от 14.06.2026';
 /* маленький футер с номером версии — показывается внизу на всех экранах */
 function verLine(){ return `<div class="note" style="text-align:center;opacity:.5;font-size:11px;margin-top:16px;letter-spacing:.02em">${t('ver_lbl')} ${APP_VERSION}</div>` }
 
@@ -253,10 +253,6 @@ async function loadState(){ const raw=await store.get('medapp:state:v2');
  if(state.passwordHash===undefined)state.passwordHash=hash('1234');
  if(!state.deviceName)state.deviceName='';
  if(!(Number(state.statusPollSec)>0))state.statusPollSec=20;
-for(const id in state.meds){ if((state.meds[id].qty||'').indexOf('см. ⚠')>=0)state.meds[id].qty='2 мг — спросить врача' }
- for(const id in state.meds){ const m=state.meds[id];
-  if(m.name==='FLIXOTIDE'){ if(!m.qty||/спросить врача|см\. ⚠|2 мг/.test(m.qty))m.qty='4 ампулы (4 мг)';
-   if(m.warnKey==='w_flixotide'){delete m.warnKey; delete m.warnLevel} } }
  state.times.sort() }
 async function saveState(){ state.times.sort(); await store.set('medapp:state:v2',JSON.stringify(state)) }
 /* medImg(...) теперь в data.js (ссылается на img/<id>.png через IMG_SRC) */
