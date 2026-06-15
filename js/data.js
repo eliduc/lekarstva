@@ -14,11 +14,32 @@ const TYPES={
  inh:{c:'#059669',bg:'#DCF3EA',svg:'<path d="M3 12h6"/><circle cx="14" cy="12" r="4"/><path d="M18 12h3"/>'},
  sup:{c:'#EA580C',bg:'#FCE8DC',svg:'<path d="M12 3c2 2 3 4 3 7v7a3 3 0 0 1-6 0v-7c0-3 1-5 3-7z"/>'}
 };
-function tyLabel(k){return t('ty_'+k)}
+/* КАО#2 (SECURITY): m.type приходит из облачного конфига и попадает в innerHTML
+   через tyLabel (label типа). Для неизвестного типа t('ty_'+k) возвращал k СЫРЫМ
+   (XSS вида type='<img onerror=...>'). Переводим только известные типы из TYPES,
+   иначе экранируем фолбэк. */
+function tyLabel(k){ return (TYPES&&TYPES[k])?t('ty_'+k):esc(k); }
 const ORDER={tab:0,cap:1,syr:2,drop:3,inh:4,sup:5};
 const DAYORDER=[0,1,2,3,4,5,6];
 function icon(ty,s=18){const d=TYPES[ty]||TYPES.tab;return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d.svg}</svg>`}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+/* КАО#1: безопасная подстановка идентификатора/значения в инлайновый onclick вида
+   onclick="fn('${escAttrJs(id)}')". Здесь ДВА контекста: внешний — HTML-атрибут
+   (в двойных кавычках), внутренний — JS-строка (в одинарных). Браузер сначала
+   декодирует HTML-сущности, ПОТОМ парсит результат как JS, поэтому одинарную кавычку
+   нельзя гасить через &#39; (она вернётся к JS-парсеру и порвёт строку). Экранируем:
+   сначала бэкслэш и ' на уровне JS-строки (через \), затем " < > & на уровне HTML-
+   атрибута (через сущности). Так облачные ключи лекарств / ISO-значения ячеек
+   таблетницы не вырываются из onclick (защита от инъекции из скомпрометированного
+   облачного репозитория). */
+function escAttrJs(s){ return String(s??'')
+  .replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/[\r\n]/g,' ')
+  .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+/* КАО#2 (SECURITY): warnLevel приходит из облачного конфига и подставляется СЫРЫМ
+   в class-атрибут <div class="wflag ${...}"> (app.js). Раньше это давало вырыв из
+   атрибута (XSS вида warnLevel='"><img onerror=...>'). Допустимы только три класса —
+   возвращаем строго из whitelist, любое чужое значение → 'info'. */
+function wlClass(w){ return (w==='red'||w==='amber'||w==='info')?w:'info'; }
 
 /* ============ DEFAULT DATA ============ */
 function defaultState(){return JSON.parse(JSON.stringify({
@@ -60,8 +81,17 @@ var IMG_SRC = {
  "aerovent": "img/aerovent.jpg",
  "flixotide": "img/flixotide.jpg"
 };
+/* КАО#3 (SECURITY): m.img приходит из облачного конфига (state.meds[*].img) и
+   подставляется СЫРЫМ в <img src="${medImg(m)}"> во многих местах app.js. Прежняя
+   проверка пропускала ЛЮБУЮ строку, начинающуюся с "data:", включая
+   data:image/png;base64,x" onerror="alert(...) — что давало вырыв из атрибута src
+   и XSS из скомпрометированного облака. Легитимные фото — это canvas.toDataURL(),
+   т.е. data:image/<...>;base64,<A-Za-z0-9+/=>, где НЕТ кавычек/угловых скобок/
+   пробелов/бэктиков. Пропускаем data:-URL только если он соответствует этой
+   безопасной форме; иначе отбрасываем (как и любой посторонний src). */
+function isSafeDataImg(s){ return /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]*$/i.test(s); }
 function medImg(m){ if(!m||!m.img)return null;
-  if(typeof m.img==='string'&&m.img.indexOf('data:')===0)return m.img;
+  if(typeof m.img==='string'&&m.img.indexOf('data:')===0)return isSafeDataImg(m.img)?m.img:null;
   return IMG_SRC[m.img]||null; }
 /* FNV-1a 32-бит: пароль настроек и детектор изменений бэкапа */
 function hash(str){ var h=0x811c9dc5>>>0; str=String(str);

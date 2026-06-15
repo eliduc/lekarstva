@@ -1,0 +1,6 @@
+# КАО#1 — артефакты Playwright, не коммитить
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+.cache/

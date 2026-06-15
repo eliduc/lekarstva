@@ -8,7 +8,7 @@
    но старый код вызывает их через await — это совместимо. */
 const store = window.MedStore;
 const STAGE = !!(window.MedStore && window.MedStore.isStage); // stage-версия (отдельные данные, Telegram выключен)
-const APP_VERSION = '1.6 от 14.06.2026';
+const APP_VERSION = '1.7 от 15.06.2026';
 /* маленький футер с номером версии — показывается внизу на всех экранах */
 function verLine(){ return `<div class="note" style="text-align:center;opacity:.5;font-size:11px;margin-top:16px;letter-spacing:.02em">${t('ver_lbl')} ${APP_VERSION}</div>` }
 
@@ -218,7 +218,10 @@ let boxState=null;
 async function loadBox(){ if(boxState)return boxState;
  const raw=await store.get('medapp:box');
  if(raw!=null){ try{boxState=JSON.parse(raw)||{}}catch(e){boxState={}} }
- else { boxState={}; const d=new Date(); boxState[d.getDay()+'|'+((state&&state.times[0])||'08:00')]=dateISO(d); await saveBox() }
+ /* КАО#1: на свежем устройстве таблетница ПОЛНАЯ (все ячейки залиты = нет ключей).
+    Раньше здесь сеяли ячейку today|times[0] как ОПУСТОШЁННУЮ сегодня, из-за чего
+    syncGivenFromBox() сразу метил утренний приём «ВЫДАНО» (риск пропуска дозы). */
+ else { boxState={}; await saveBox() }
  return boxState }
 async function saveBox(){ await store.set('medapp:box',JSON.stringify(boxState||{})) }
 const BOXED=['tab','cap'];
@@ -390,7 +393,7 @@ function openRefillAlert(pr){ currentRefill=pr;
  document.getElementById('rday').textContent=DF()[pr.day].toUpperCase();
  document.getElementById('rinfo').textContent=(pr.iso===dateISO())?t('refill_sub'):t('refill_late_sub');
  const cells=boxEmptyTimes(pr.day); const showCells=cells.length?cells:boxTimes();
- document.getElementById('rstrip').innerHTML=dayStrip(pr.day)+`<div class="note" style="font-weight:800;font-size:13px">${tf('cells_lbl',{t:showCells.join(' · ')})}</div>`;
+ document.getElementById('rstrip').innerHTML=dayStrip(pr.day)+`<div class="note" style="font-weight:800;font-size:13px">${tf('cells_lbl',{t:esc(showCells.join(' · '))})}</div>`;/* КАО#4: esc — времена ячеек из облака, tf не экранирует */
  document.getElementById('ralert').classList.add('open');
  try{navigator.vibrate&&navigator.vibrate([200,120,200])}catch(e){}
  startRinging() }
@@ -406,7 +409,7 @@ async function renderHome(force){ const el=document.getElementById('scr-home'); 
  if(next){ const [H,M]=next.split(':').map(Number); const tt=new Date(n); tt.setHours(H,M,0,0);
   let mins=Math.max(0,Math.round((tt-n)/60000)); const h=Math.floor(mins/60),m=mins%60;
   const ts=fmtDur(h,m);
-  nextHtml=`<div class="next"><div class="lbl">${t('next_intake')}</div><div class="big">${next}</div>
+  nextHtml=/* КАО#4: esc(next) — время из облачного конфига (state.times) в HTML-тексте */`<div class="next"><div class="lbl">${t('next_intake')}</div><div class="big">${esc(next)}</div>
   <div class="in">${tf('in_t',{t:ts,m:fmtMeds(activeMedsAt(next,day).length)})}</div></div>`;
  } else {
   const anyLeft=state.times.some(tm=>!done.includes(tm));
@@ -418,15 +421,15 @@ async function renderHome(force){ const el=document.getElementById('scr-home'); 
  for(const tm of state.times){ const meds=activeMedsAt(tm,day); const isDone=done.includes(tm);
   const isNow=!isDone&&(()=>{const[H,M]=tm.split(':').map(Number);const x=new Date(n);x.setHours(H,M,0,0);return n>=x&&(n-x)<10*60*1000})();
   const late=!isDone&&!isNow&&tm<hm;
-  rows+=`<button class="trow" onclick="${isDone?`undoGiven('${tm}')`:`startGive('${tm}')`}">
-   <span class="tm">${tm}</span>
+  rows+=/* КАО#1: escAttrJs/esc — времена могут прийти из облачного конфига */`<button class="trow" onclick="${isDone?`undoGiven('${escAttrJs(tm)}')`:`startGive('${escAttrJs(tm)}')`}">
+   <span class="tm">${esc(tm)}</span>
    <span class="rowmid"><span class="tyics">${[...new Set(meds.map(x=>x.type))].sort((a,b)=>(ORDER[a]??9)-(ORDER[b]??9)).map(k=>`<span class="tyic" style="background:${TYPES[k].bg};color:${TYPES[k].c}">${icon(k,15)}</span>`).join('')}</span><span class="cnt">${fmtMeds(meds.length)} ${meds.some(m=>m.warnLevel==='red')?'❗':''}</span></span>
    <span class="st ${isDone?'done':isNow?'now':'wait'}">${isDone?t('st_done'):isNow?t('st_now'):late?t('st_late'):t('st_wait')}</span></button>` }
  const pr=await pendingRefill();
- const banner=pr?`<button class="trow" style="background:#F4EEFE;border-color:#dcc9f8" onclick="startRefill('${pr.iso}',${pr.day})">
+ const banner=pr?/* КАО#1: escAttrJs — pr.iso приходит из облачного статуса таблетницы */`<button class="trow" style="background:#F4EEFE;border-color:#dcc9f8" onclick="startRefill('${escAttrJs(pr.iso)}',${Number(pr.day)})">
   <span style="font-size:24px">📦</span>
   <span style="text-align:start"><span style="display:block;font-weight:900;font-size:15px;color:#5b21b6">${t('refill_alert_t')}</span>
-  <span style="display:block;font-size:12.5px;color:#7c3aed;font-weight:700">${tf('refill_section',{d:DF()[pr.day].toUpperCase()})} · ${tf('cells_n',{n:boxEmptyTimes(pr.day).length})} · ${pr.iso===dateISO()?t('b_today'):(pr.iso.slice(8,10)+'.'+pr.iso.slice(5,7))}</span></span>
+  <span style="display:block;font-size:12.5px;color:#7c3aed;font-weight:700">${tf('refill_section',{d:DF()[pr.day].toUpperCase()})} · ${tf('cells_n',{n:boxEmptyTimes(pr.day).length})} · ${pr.iso===dateISO()?t('b_today'):esc(pr.iso.slice(8,10)+'.'+pr.iso.slice(5,7))}</span></span>
   <span class="st now" style="margin-inline-start:auto">!</span></button>`:'';
  el.innerHTML=`${nextHtml}${banner}<h2>${tf('today_is',{d:DF()[day]})}</h2>${rows}
  <button class="bigbtn" onclick="show('collect')">${t('btn_collect')}</button>
@@ -447,11 +450,11 @@ function renderCollect(){ const el=document.getElementById('scr-collect');
  let cells=`<span class="bxt"></span>`;
  for(const d of DAYORDER){ cells+=`<span class="bxh ${d===today?'tdy':''}">${DS()[d]}</span>` }
  for(const tm of bts){
-  cells+=`<span class="bxt">${tm}</span>`;
+  cells+=`<span class="bxt">${esc(tm)}</span>`; /* КАО#1: время может прийти из облака */
   for(const d of DAYORDER){ const key=d+'|'+tm; const emptyISO=boxState&&boxState[key];
    cells+= emptyISO
-    ? `<button class="bxc empty ${d===today?'tdy':''}" onclick="cellMenu(${d},'${tm}')">${t('box_empty_cell')}</button>`
-    : `<button class="bxc full ${d===today?'tdy':''}" onclick="cellMenu(${d},'${tm}')">✓</button>` } }
+    ? `<button class="bxc empty ${d===today?'tdy':''}" onclick="cellMenu(${d},'${escAttrJs(tm)}')">${t('box_empty_cell')}</button>`
+    : `<button class="bxc full ${d===today?'tdy':''}" onclick="cellMenu(${d},'${escAttrJs(tm)}')">✓</button>` } } /* КАО#1: escAttrJs от инъекции времени в onclick */
  el.innerHTML=`<h2>📦 ${t('box_title')}</h2>
  <div class="card"><div class="bxgrid" style="grid-template-columns:54px repeat(${DAYORDER.length},1fr)">${cells}</div></div>
  <div class="note">${t('box_legend')}</div>
@@ -499,7 +502,7 @@ function renderStep(){ const s=steps[stepIdx]; if(!s){closeWiz();return}
     <div class="sb">${esc(medSub(m))}</div>
     <div class="ph">${ph}</div>
     <div><span class="qy" style="color:${d.c};border-color:${d.c}">${esc(locQty(m.qty))}</span></div>
-    ${medWarn(m)?`<div class="wflag ${m.warnLevel||'info'}${m.warnBig?' gbig':''}">${esc(medWarn(m))}</div>`:''}</div>`;
+    ${medWarn(m)?`<div class="wflag ${wlClass(m.warnLevel)}${m.warnBig?' gbig':''}">${esc(medWarn(m))}</div>`:''}</div>`; /* КАО#2: wlClass — whitelist warnLevel (анти-XSS из облака) */
    nav.innerHTML=`${backBtn}<button class="done" onclick="stepIdx++;renderStep()">${refillCtx?t('placed_btn'):t('done_btn')}</button>`;
   }
  } else if(s.k==='rintro'){
@@ -508,7 +511,7 @@ function renderStep(){ const s=steps[stepIdx]; if(!s){closeWiz();return}
    <div class="sb" style="font-size:14px;font-weight:800;letter-spacing:.05em;margin-top:6px">${t('refill_intro_t')}</div>
    <div class="wbig" style="font-size:38px;color:#6b21a8">${DF()[s.day].toUpperCase()}</div>
    ${dayStrip(s.day)}
-   <div class="note" style="font-weight:800;font-size:13px">${tf('cells_lbl',{t:((refillCtx&&refillCtx.times)?refillCtx.times:boxTimes()).join(' · ')})}</div>
+   <div class="note" style="font-weight:800;font-size:13px">${tf('cells_lbl',{t:esc(((refillCtx&&refillCtx.times)?refillCtx.times:boxTimes()).join(' · '))})}</div>${/* КАО#4: esc — времена ячеек из облака, tf не экранирует */''}
    <div class="wflag info" style="margin-top:10px">${t('refill_intro_note')}</div></div>`;
   nav.innerHTML=`<button class="done" style="background:#7C3AED" onclick="stepIdx++;renderStep()">${t('refill_start')}</button>`;
  } else if(s.k==='rdone'){
@@ -532,7 +535,7 @@ function renderStep(){ const s=steps[stepIdx]; if(!s){closeWiz();return}
     ${im?`<img src="${im}">`:`<span class="gic" style="background:${d.bg};color:${d.c}">${icon(m.type,30)}</span>`}
     <div style="flex:1;min-width:0"><div class="gn">${esc(m.name)}${medRu(m)?` <span class="gnru">${esc(medRu(m))}</span>`:''}</div>
      <div class="gs">${skip?t('skip_chip'):esc(medSub(m))}</div>
-     ${(!skip&&warn)?`<div class="wflag ${m.warnLevel||'info'} ${m.warnBig?'gbig':'gwarn'}">${esc(warn)}</div>`:''}</div>
+     ${/* КАО#2: wlClass — whitelist warnLevel (анти-XSS из облака) */(!skip&&warn)?`<div class="wflag ${wlClass(m.warnLevel)} ${m.warnBig?'gbig':'gwarn'}">${esc(warn)}</div>`:''}</div>
     <span class="gq" style="${skip?'color:#B42222;border-color:#B42222':`color:${d.c};border-color:${d.c}`}">${skip?t('alert_skip'):esc(locQty(m.qty))}</span></div>` }
   const gsteps=steps.filter(x=>x.k==='group'&&x.time===s.time);
   const stepper=gsteps.map((g,i)=>{ const ty=[...new Set(g.meds.map(m=>m.type))].sort((a,b)=>(ORDER[a]??9)-(ORDER[b]??9))[0]; const dd=TYPES[ty];
@@ -552,14 +555,14 @@ function renderStep(){ const s=steps[stepIdx]; if(!s){closeWiz();return}
   body.innerHTML=`<div class="wcard"><div style="font-size:54px;line-height:1">🙏</div>
    <div class="wbig" style="font-size:32px">${esc(tf('thanks_t',{name:state.caregiver||'Джамшид'}))}</div>
    <div class="sb" style="font-size:17px">${t('thanks_s')}</div>
-   <div class="wflag info" style="margin-top:16px;font-size:16px;font-weight:800">${nxt?tf('next_at',{t:nxt}):t('none_more')}</div></div>`;
+   <div class="wflag info" style="margin-top:16px;font-size:16px;font-weight:800">${nxt?tf('next_at',{t:esc(nxt)}):t('none_more')}</div></div>`;/* КАО#4: esc(nxt) — время из облака, tf не экранирует */
   nav.innerHTML=`<button class="done" onclick="closeWiz();show('home')">${t('alert_x')}</button>`;
  } else if(s.k==='tdone'){
   document.getElementById('wprog').textContent=refillCtx?tf('rtdone',{t:s.time}):tf('tdone_lbl',{t:s.time});
   const nxt=steps.slice(stepIdx+1).find(x=>x.k==='med'||x.k==='skip');
   body.innerHTML=`<div class="wcard"><div class="wcheck"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg></div>
-   <div class="wbig">${s.time} ✓</div><div class="sb" style="font-size:17px">${refillCtx?t('cell_done'):t('tdone')}</div></div>`;
-  nav.innerHTML=`${backBtn}<button class="done" onclick="finishTime('${s.time}')">${nxt?tf('next_btn',{t:nxt.time}):t('finish')}</button>`;
+   <div class="wbig">${esc(s.time)} ✓</div><div class="sb" style="font-size:17px">${refillCtx?t('cell_done'):t('tdone')}</div></div>`;
+  nav.innerHTML=/* КАО#1: escAttrJs времени в onclick; КАО#4: esc(nxt.time) — tf не экранирует подстановку */`${backBtn}<button class="done" onclick="finishTime('${escAttrJs(s.time)}')">${nxt?tf('next_btn',{t:esc(nxt.time)}):t('finish')}</button>`;
  } else if(s.k==='alldone'){
   document.getElementById('wprog').textContent='';
   body.innerHTML=`<div class="wcard"><div class="wcheck" style="width:110px;height:110px"><svg width="58" height="58" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg></div>
@@ -586,12 +589,12 @@ function startRefill(iso,day,onlyTimes){ const cells=(onlyTimes&&onlyTimes.lengt
  steps.push({k:'rdone',iso,day});
  stepIdx=0; document.getElementById('wiz').classList.add('open'); renderStep() }
 function cellMenu(day,tm){ const key=day+'|'+tm; const emptyISO=boxState&&boxState[key];
- openModal(`<h3>📦 ${DF()[day]} · ${tm}</h3>
+ openModal(/* КАО#1: escAttrJs/esc от инъекции облачных ISO ячеек и времён в onclick/HTML */`<h3>📦 ${DF()[day]} · ${esc(tm)}</h3>
   <div class="wflag ${emptyISO?'red':'info'}" style="text-align:center;font-size:16px">${emptyISO?t('c_now_empty'):t('c_now_full')}</div>
-  ${emptyISO?`<button class="bigbtn" style="background:#7C3AED" onclick="closeModal();startRefill('${emptyISO}',${day},['${tm}'])">${t('c_fill_steps')}</button>
-   <button class="bigbtn green" onclick="markCellFull(${day},'${tm}')">${t('c_mark_full')}</button>`
-  :`<button class="bigbtn" onclick="cellContents(${day},'${tm}')">${t('c_show')}</button>
-   <button class="bigbtn red" onclick="markCellEmpty(${day},'${tm}')">${t('c_mark_empty')}</button>`}
+  ${emptyISO?`<button class="bigbtn" style="background:#7C3AED" onclick="closeModal();startRefill('${escAttrJs(emptyISO)}',${day},['${escAttrJs(tm)}'])">${t('c_fill_steps')}</button>
+   <button class="bigbtn green" onclick="markCellFull(${day},'${escAttrJs(tm)}')">${t('c_mark_full')}</button>`
+  :`<button class="bigbtn" onclick="cellContents(${day},'${escAttrJs(tm)}')">${t('c_show')}</button>
+   <button class="bigbtn red" onclick="markCellEmpty(${day},'${escAttrJs(tm)}')">${t('c_mark_empty')}</button>`}
   <button class="bigbtn gray" onclick="closeModal()">${t('cancel')}</button>`) }
 function cellContents(day,tm){ const meds=boxMedsAt(tm); let rows='';
  for(const m of meds){ const d=TYPES[m.type]||TYPES.tab; const im=medImg(m); const skip=(m.excludeDays||[]).includes(day);
@@ -599,7 +602,7 @@ function cellContents(day,tm){ const meds=boxMedsAt(tm); let rows='';
    ${im?`<img src="${im}" alt="">`:`<span class="aic" style="background:${d.bg};color:${d.c}">${icon(m.type,24)}</span>`}
    <div><div class="an">${esc(m.name)}${medRu(m)?` <span class="anru">${esc(medRu(m))}</span>`:''}</div><div class="at" style="color:${skip?'#B42222':d.c}">${skip?t('skip_box'):tyLabel(m.type)}</div></div>
    <span class="aq" style="${skip?'':`color:${d.c};border-color:${d.c}`}">${skip?'—':esc(locQty(m.qty))}</span></div>` }
- openModal(`<h3>📦 ${DF()[day]} · ${tm}</h3>
+ openModal(/* КАО#1: esc времени (может прийти из облака) */`<h3>📦 ${DF()[day]} · ${esc(tm)}</h3>
   <div class="note" style="font-weight:800;font-size:14.5px;margin:0 0 8px">${t('c_in_cell')}</div>
   <div class="alist" style="max-height:52vh">${rows}</div>
   <button class="bigbtn gray" onclick="closeModal()">${t('close')}</button>`) }
@@ -640,8 +643,9 @@ async function savePassword(v){ v=(v||'').trim(); if(v.length<4){alert(t('pw_sho
 /* ============ SETTINGS ============ */
 function renderSettings(){ if(!setAuthed){renderSettingsGate();return} const el=document.getElementById('scr-settings');
  let timesHtml='';
+ /* КАО#2: esc(tm) — время из облачного конфига, анти-вырыв из value-атрибута */
  state.times.forEach((tm,i)=>{ timesHtml+=`<div class="row">
-  <input type="time" value="${tm}" onchange="changeTime(${i},this.value)">
+  <input type="time" value="${esc(tm)}" onchange="changeTime(${i},this.value)">
   <span style="font-size:13px;color:var(--muted);font-weight:600">${fmtMeds(medsAt(tm).length)}</span>
   <button class="icbtn red" style="margin-inline-start:auto" onclick="delTime(${i})">🗑</button></div>` });
  let schedHtml='';
@@ -649,14 +653,19 @@ function renderSettings(){ if(!setAuthed){renderSettingsGate();return} const el=
   for(const m of sortMeds(medsAt(tm))){ const im=medImg(m); const d=TYPES[m.type]||TYPES.tab;
    chips+=`<div class="medchip">${im?`<img src="${im}">`:`<span style="color:${d.c}">${icon(m.type,26)}</span>`}
     <div><div class="mn">${esc(m.name)}${medRu(m)?` <span style="font-weight:800;color:var(--muted)">${esc(medRu(m))}</span>`:''}</div><div class="mq">${tyLabel(m.type)} · ${esc(locQty(m.qty))}</div></div>
-    <button class="icbtn red x" onclick="removeFromTime('${tm}','${m.id}')">✕</button></div>` }
-  schedHtml+=`<div style="margin-top:14px"><div style="font-weight:900;font-size:19px">${tm}</div>${chips}
-  <button class="addln" onclick="pickMedFor('${tm}')">${tf('add_med',{t:tm})}</button></div>` }
+    <button class="icbtn red x" onclick="removeFromTime('${escAttrJs(tm)}','${escAttrJs(m.id)}')">✕</button></div>` } /* КАО#1: escAttrJs от инъекции облачных ключей в onclick */
+  /* КАО#4 (SECURITY): tm — ключ времени из облачного конфига (state.times). Раньше он
+     шёл СЫРЫМ в ТРЁХ местах: (1) onclick="pickMedFor('${tm}')" — вырыв из JS-строки
+     (08:00');code;// исполнял произвольный код); (2) заголовок-текст ${tm}; (3) подстановка
+     {t} в tf('add_med') — tf() НЕ экранирует, текст-контекст. Эскейпим все три:
+     escAttrJs в onclick, esc в HTML-тексте и esc для значения подстановки tf. */
+  schedHtml+=`<div style="margin-top:14px"><div style="font-weight:900;font-size:19px">${esc(tm)}</div>${chips}
+  <button class="addln" onclick="pickMedFor('${escAttrJs(tm)}')">${tf('add_med',{t:esc(tm)})}</button></div>` }
  let lib='';
  for(const [id,m] of Object.entries(state.meds)){ const im=medImg(m); const d=TYPES[m.type]||TYPES.tab;
   lib+=`<div class="libc">${im?`<img src="${im}">`:`<div class="noimg" style="background:${d.bg};color:${d.c}">${icon(m.type,30)}</div>`}
    <div class="n">${esc(m.name)}</div>${medRu(m)?`<div class="n" style="font-size:12.5px;color:var(--muted);margin-top:1px">${esc(medRu(m))}</div>`:''}<div class="ty" style="color:${d.c}">${tyLabel(m.type)}</div>
-   <div class="btns"><button class="ebtn" onclick="editMed('${id}')">${t('edit')}</button><button class="dbtn" onclick="delMed('${id}')">${t('del')}</button></div></div>` }
+   <div class="btns"><button class="ebtn" onclick="editMed('${escAttrJs(id)}')">${t('edit')}</button><button class="dbtn" onclick="delMed('${escAttrJs(id)}')">${t('del')}</button></div></div>` } /* КАО#1: escAttrJs от инъекции облачных ключей в onclick */
  el.innerHTML=`<button class="bigbtn" style="background:#5b21b6;margin-top:4px" onclick="openHistory()">📜 ${t('hist_open')}</button>
  <h2>👤 ${t('f_caregiver')}</h2>
  <div class="card"><input type="text" value="${esc(state.caregiver||'')}" onchange="saveCaregiver(this.value)" style="font-weight:800;font-size:17px">
@@ -681,7 +690,7 @@ function renderSettings(){ if(!setAuthed){renderSettingsGate();return} const el=
  <h2>📦 ${t('set_box')}</h2>
  <div class="card"><div style="display:flex;align-items:center;gap:10px">
   <span style="flex:1;font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.04em">${t('f_refill_time')}</span>
-  <input type="time" value="${state.refillTime||'22:30'}" onchange="setRefillTime(this.value)"></div>
+  <input type="time" value="${esc(state.refillTime||'22:30')}" onchange="setRefillTime(this.value)"></div>${/* КАО#2: esc(refillTime) — из облачного конфига, анти-вырыв из value */''}
   <div class="note">${t('box_note')}</div>
   <button class="sb1" style="border-radius:11px;padding:11px 13px;font-weight:800;font-size:14px;margin-top:8px" onclick="testRefill()">${t('test_refill')}</button></div>
  <h2>${t('set_sched')}</h2><div class="card">${schedHtml||'<div class="note">'+t('no_times')+'</div>'}</div>
@@ -759,9 +768,9 @@ async function delMed(id){ const m=state.meds[id]; if(!confirm(tf('del_med',{m:m
  appendEvent('med_removed',{med:m.name}); await saveState(); renderSettings() }
 function pickMedFor(tm){ const used=new Set(state.schedule[tm]||[]); let rows='';
  for(const [id,m] of Object.entries(state.meds)){ if(used.has(id))continue; const d=TYPES[m.type]||TYPES.tab; const im=medImg(m);
-  rows+=`<div class="medchip" style="cursor:pointer" onclick="addToTime('${tm}','${id}')">${im?`<img src="${im}">`:`<span style="color:${d.c}">${icon(m.type,26)}</span>`}
+  rows+=/* КАО#1: escAttrJs от инъекции облачных ключей в onclick */`<div class="medchip" style="cursor:pointer" onclick="addToTime('${escAttrJs(tm)}','${escAttrJs(id)}')">${im?`<img src="${im}">`:`<span style="color:${d.c}">${icon(m.type,26)}</span>`}
    <div><div class="mn">${esc(m.name)}${medRu(m)?` <span style="font-weight:800;color:var(--muted)">${esc(medRu(m))}</span>`:''}</div><div class="mq">${tyLabel(m.type)} · ${esc(locQty(m.qty))}</div></div><span style="margin-inline-start:auto;font-weight:900;color:var(--teal)">＋</span></div>` }
- openModal(`<h3>${tf('add_to',{t:tm})}</h3>${rows||'<div class="note">'+t('all_added')+'</div>'}
+ openModal(/* КАО#4: esc(tm) — время из облака в заголовке модалки, tf не экранирует */`<h3>${tf('add_to',{t:esc(tm)})}</h3>${rows||'<div class="note">'+t('all_added')+'</div>'}
   <button class="bigbtn gray" onclick="closeModal()">${t('close')}</button>`) }
 async function addToTime(tm,id){ (state.schedule[tm]=state.schedule[tm]||[]).push(id); appendEvent('sched_add',{time:tm,med:(state.meds[id]||{}).name||id}); await saveState(); closeModal(); renderSettings() }
 async function resetAll(){ if(!confirm(t('reset_q')))return; state=defaultState(); await saveState(); renderSettings() }
