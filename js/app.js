@@ -8,7 +8,7 @@
    но старый код вызывает их через await — это совместимо. */
 const store = window.MedStore;
 const STAGE = !!(window.MedStore && window.MedStore.isStage); // stage-версия (отдельные данные, Telegram выключен)
-const APP_VERSION = '1.7 от 15.06.2026';
+const APP_VERSION = '1.8 от 15.06.2026';
 /* маленький футер с номером версии — показывается внизу на всех экранах */
 function verLine(){ return `<div class="note" style="text-align:center;opacity:.5;font-size:11px;margin-top:16px;letter-spacing:.02em">${t('ver_lbl')} ${APP_VERSION}</div>` }
 
@@ -146,6 +146,8 @@ L.ru.stage_tg_off="Тестовая (stage) версия — Telegram отклю
 L.en.stage_tg_off="Test (stage) version — Telegram is disabled so it can't post to the live channel.";
 L.he.stage_tg_off="גרסת בדיקה (stage) — Telegram מושבת כדי לא לשלוח לערוץ הפעיל.";
 L.uz.stage_tg_off="Sinov (stage) versiyasi — Telegram oʻchirilgan, jonli kanalga yubormaydi.";
+/* отдельный ярлык списка для сообщения о ПРОПУСКЕ (нельзя "Выдано:") */
+L.ru.tg_due="Нужно было дать:"; L.en.tg_due="Was due:"; L.he.tg_due="היה צריך לתת:"; L.uz.tg_due="Berilishi kerak edi:";
 
 /* ============ TELEGRAM ============ */
 /* В stage Telegram ВСЕГДА выключен — даже если в настройки попал боевой токен.
@@ -175,7 +177,7 @@ async function notifyGiven(time){ if(!tgConfigured())return; const day=new Date(
  await tgSend(body) }
 async function notifyMissed(time){ if(!tgConfigured())return; const day=new Date().getDay();
  const head='<b>'+t('tg_missed_t')+'</b>';
- const body=head+'\n'+tf('tg_at',{t:time})+' · '+DF()[day]+'\n\n'+t('tg_list')+'\n'+tgLines(time,day);
+ const body=head+'\n'+tf('tg_at',{t:time})+' · '+DF()[day]+'\n\n'+t('tg_due')+'\n'+tgLines(time,day);/* КАО-fix: «Нужно было дать:», не «Выдано:» в сообщении о пропуске */
  await tgSend(body) }
 function sumStatusLine(time, done, gat){ if(done.includes(time)){ const at=gat[time]; return '<b>'+time+'</b> — '+t('tg_sum_given')+(at?(' '+tf('tg_sum_at',{t:at})):''); }
  // not given: pending if its time (today) hasn't arrived yet, else missed
