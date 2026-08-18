@@ -8,7 +8,7 @@
    но старый код вызывает их через await — это совместимо. */
 const store = window.MedStore;
 const STAGE = !!(window.MedStore && window.MedStore.isStage); // stage-версия (отдельные данные, Telegram выключен)
-const APP_VERSION = '2.1 от 31.07.2026';
+const APP_VERSION = '2.2 от 18.08.2026';
 /* маленький футер с номером версии — показывается внизу на всех экранах */
 function verLine(){ return `<div class="note" style="text-align:center;opacity:.5;font-size:11px;margin-top:16px;letter-spacing:.02em">${t('ver_lbl')} ${APP_VERSION}</div>` }
 

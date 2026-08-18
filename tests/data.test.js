@@ -43,10 +43,11 @@ test('defaultState — каждый id в расписании существу�
   }
 });
 
-test('defaultState — amiodacore.excludeDays = [2,5]', () => {
+test('defaultState — amiodacore ежедневно (с 18.08.2026 без excludeDays)', () => {
   const c = loadCore();
   const s = c.defaultState();
-  assert.deepEqual(s.meds.amiodacore.excludeDays, [2, 5]);
+  assert.equal(s.meds.amiodacore.excludeDays, undefined);
+  assert.equal(s.meds.amiodacore.warn, undefined);
 });
 
 test('defaultState — esomeprazole warnLevel=red, warnBig=true', () => {
