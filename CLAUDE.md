@@ -32,9 +32,10 @@ Telegram в stage жёстко выключен. Деплой stage: `git push s
 - `log/<iso>.json` — вечный журнал событий, только дозапись, слияние union по `id`,
   никогда не перезаписывается. Это единственное надёжное доказательство выдачи.
 
-Уведомления шлёт **только сервер** — GitHub Actions в data-репозитории
-(`.github/workflows/notify.yml` + `.github/notify.mjs`, cron `7,37 * * * *`,
-TZ Asia/Jerusalem). Приложение с версии 1.9 missed/summary не шлёт.
+Сообщения о пропуске (missed) и вечернюю сводку (summary) шлёт **только сервер** —
+GitHub Actions в data-репозитории (`.github/workflows/notify.yml` + `.github/notify.mjs`,
+cron `7,37 * * * *`, TZ Asia/Jerusalem). Само приложение шлёт в Telegram только мгновенное
+«Выдано» при отметке (`notifyGiven`), а по кнопкам в настройках — сводку и тестовое сообщение.
 
 ## Команды
 
